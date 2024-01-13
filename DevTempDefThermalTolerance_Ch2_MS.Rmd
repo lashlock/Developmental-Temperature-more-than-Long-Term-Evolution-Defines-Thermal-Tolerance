@@ -1,0 +1,851 @@
+---
+title: "ChapterTwo_ManuscriptCode"
+output: html_document
+date: "2023-04-08"
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+setwd("/Users/whiteabalone/Desktop/Postdoc/gradschool/UVM/Copepods/ExperimentalData_UVM")
+
+#install.packages("sos")
+library(sos)
+findFn("TukeyHSD")
+```
+
+Load in libraries
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(ggExtra)
+library(rcompanion)
+library(FSA)
+library(car)
+library(ARTool)
+library(lme4)
+library(reshape2)
+library(grid)
+library(gridExtra)
+```
+
+Loading in Upper Lethal Temperature Data
+```{r}
+mydata <- read.table("UCONN_ULT_Final.csv", header=TRUE, 
+  	sep=",")
+head(mydata)
+```
+
+
+Loading LLS Data
+```{r}
+myLLSdata <- read.table("UCONN_LLS_Reps_NoTreat.csv", header=TRUE, 
+  	sep=",")
+head(myLLSdata)
+```
+
+
+Loading Temp by Salinity data
+```{r}
+TSdata <- read.table("SalintyTemp.csv", header=TRUE, 
+  	sep=",")
+head(TSdata)
+TSdata$Salinity <- as.factor(TSdata$Salinity)
+```
+
+First want to look at the normality of each dataset
+
+Upper Lethal Temperature Data Normality
+```{r}
+ggqqplot(mydata$ULT)  #Not too far off
+# Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample 
+# and the normal distribution. A 45-degree reference line is also plotted.
+
+ggdensity(mydata$ULT, xlab = "ULT") 
+
+shapiro.test(mydata$ULT)
+```
+
+Shapiro-Wilk normality test
+
+data:  mydata$ULT
+W = 0.93417, p-value = 0.0005199
+
+Significant p value means different than normal distribution
+
+
+Log Transforming Data
+```{r}
+
+mydata$LogULT <- log(mydata$ULT)
+mydata
+
+```
+
+
+Looking to see if data is normally distributed
+
+```{r}
+ggqqplot(mydata$LogULT) 
+
+ggdensity(mydata$LogULT, xlab = "LogULT") 
+
+shapiro.test(mydata$LogULT)
+```
+
+Shapiro-Wilk normality test
+
+data:  mydata$LogULT
+W = 0.93827, p-value = 0.0008484
+
+
+Square root transformation
+```{r}
+
+mydata$SquareULT <- sqrt(mydata$ULT)
+mydata
+
+```
+
+
+Looking to see if data is normally distributed
+
+```{r}
+ggqqplot(mydata$SquareULT) 
+# Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample 
+# and the normal distribution. A 45-degree reference line is also plotted.
+
+ggdensity(mydata$SquareULT, xlab = "SquareULT") 
+
+shapiro.test(mydata$SquareULT)
+```
+
+	Shapiro-Wilk normality test
+
+data:  mydata$SquareULT
+W = 0.93629, p-value = 0.0006685
+
+
+Checking for homogeneity of variance
+```{r}
+head(mydata)
+leveneTest(ULT~Group, data=mydata)
+leveneTest(LogULT~Group, data=mydata)
+leveneTest(SquareULT~Group, data=mydata)
+```
+All significantly different than homogeneous variance
+
+Looking at anova to see how residuals look 
+```{r}
+Model_aov <- aov(ULT~Group, data = mydata)
+summary(Model_aov)
+plot(Model_aov)
+
+```
+
+
+
+
+LLS Data Normality
+```{r}
+ggqqplot(myLLSdata$OLLS)  #Not too far off
+# Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample 
+# and the normal distribution. A 45-degree reference line is also plotted.
+
+ggdensity(myLLSdata$OLLS, xlab = "LLS") 
+
+shapiro.test(myLLSdata$OLLS)
+```
+Shapiro-Wilk normality test
+
+data:  myLLSdata$OLLS
+W = 0.84058, p-value = 2.538e-05
+
+Not normal
+
+
+Checking for homogeneity of variance
+```{r}
+head(myLLSdata)
+leveneTest(OLLS~Group, data=myLLSdata)
+```
+Levene's Test for Homogeneity of Variance (center = median)
+      Df F value Pr(>F)
+group  2  0.7392 0.4837
+      41  
+      
+Looks like there is homogeneous variance here 
+
+Looking at anova to see how residuals look 
+```{r}
+Model_aov_LLS <- aov(OLLS~Group, data = myLLSdata)
+summary(Model_aov_LLS)
+plot(Model_aov_LLS)
+```
+
+
+Temp by Sal Data Normality
+```{r}
+ggqqplot(TSdata$ULT)  #Not too far off
+# Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample 
+# and the normal distribution. A 45-degree reference line is also plotted.
+
+ggdensity(TSdata$ULT, xlab = "ULT") 
+
+shapiro.test(TSdata$ULT)
+```
+Shapiro-Wilk normality test
+
+data:  TSdata$ULT
+W = 0.88583, p-value = 0.0006497
+
+Not normal
+
+
+Checking for homogeneity of variance
+```{r}
+head(TSdata)
+leveneTest(ULT~Salinity, data=TSdata)
+```
+Levene's Test for Homogeneity of Variance (center = median)
+      Df F value Pr(>F)
+group  2  0.7978 0.4577
+      38    
+      
+Looks like there is homogeneous variance here
+
+Looking at anova to see how residuals look 
+```{r}
+Model_aov_TS <- aov(ULT~Salinity, data = TSdata)
+summary(Model_aov_TS)
+plot(Model_aov_TS)
+```
+
+
+Want to make two subsets of the data ... one for looking at plasticity and one for looking at relaxed selection
+
+Plasticity subset
+```{r}
+PlasticData <- mydata[ which(mydata$Group=='Control' ),]
+PlasticData2 <- mydata[ which(mydata$Group=='Development' ),]
+PlasticData3 <- mydata[ which(mydata$Group=='ThreeGens' ),]
+PlasticData4 <- mydata[ which(mydata$Group=='>25Gens' ),]
+PlasticData
+PlasticData2
+PlasticData3
+PlasticData4
+PlasticityData <- rbind(PlasticData, PlasticData2,PlasticData3,PlasticData4)
+PlasticityData
+
+```
+
+Relaxed Selection Subset
+```{r}
+
+RelaxData2 <- mydata[ which(mydata$Group=='DevelopmentAmbient' ),]
+RelaxData3 <- mydata[ which(mydata$Group=='ThreeGensAmbient' ),]
+RelaxData4 <- mydata[ which(mydata$Group=='>25Gens' ),]
+RelaxData5 <- mydata[ which(mydata$Group=='Control' ),]
+
+RelaxData2
+RelaxData3
+RelaxData4
+RSData <- rbind( RelaxData2,RelaxData3,RelaxData4,RelaxData5)
+RSData
+
+```
+
+Subsetting LLS Data
+
+```{r}
+PlasticLLS <- myLLSdata[ which(myLLSdata$Group=='Control' ),]
+PlasticLLS2 <- myLLSdata[ which(myLLSdata$Group=='Development' ),]
+PlasticLLS3 <- myLLSdata[ which(myLLSdata$Group=='>25Gens' ),]
+PlasticLLS
+PlasticLLS2
+PlasticLLS3
+PlasticityLLS <- rbind(PlasticLLS, PlasticLLS2, PlasticLLS3)
+PlasticityLLS
+```
+
+
+```{r}
+myLLSdata
+RelaxDataLLS2 <- myLLSdata[ which(myLLSdata$Group=='DevelopmentAmbient' ),]
+RelaxDataLLS3 <- myLLSdata[ which(myLLSdata$Group=='>25Gens' ),]
+RelaxDataLLS4 <- myLLSdata[ which(myLLSdata$Group=='Control' ),]
+
+RelaxDataLLS2
+RelaxDataLLS3
+RelaxDataLLS4
+RSDataLLS <- rbind( RelaxDataLLS2,RelaxDataLLS3,RelaxDataLLS4)
+RSDataLLS
+```
+
+
+Determining whether or not replicate impacts ULT and LLS
+
+Assessing effect of replicate for ULT
+```{r}
+UltKwRep <- kruskal.test(ULT~Replicate, mydata)
+UltKwRep
+```
+	Kruskal-Wallis rank sum test
+
+data:  ULT by Replicate
+Kruskal-Wallis chi-squared = 4.1994, df = 3, p-value = 0.2407
+
+Okay so not a significant effect of Replicate here ... what about for LLS
+
+
+```{r}
+LlsKwRep <- kruskal.test(OLLS~Replicate, data=PlasticityLLS)
+LlsKwRep
+```
+
+	Kruskal-Wallis rank sum test
+
+data:  OLLS by Replicate
+Kruskal-Wallis chi-squared = 17.53, df = 3, p-value = 0.0005497
+
+Significant effect of replicate for LLS
+
+
+Boxplot of replicates for LLS
+
+```{r}
+#Want to add Kruskal Wallis results to the plot
+
+
+str(PlasticityLLS)
+PlasticityLLS$Group <- factor(PlasticityLLS$Group,
+    levels = c(">50Gens","Development","Control"),ordered = TRUE)
+
+TreatLabs <- c(">50Gens","Development","Control")
+PlasticityLLS$Treatment<- as.factor(PlasticityLLS$Treatment)
+
+PlasticityLLS$Replicate<- as.factor(PlasticityLLS$Replicate)
+
+p <- ggplot(PlasticityLLS, aes(x=Replicate, y=OLLS, fill=Treatment)) + 
+    geom_boxplot(aes(middle = mean(OLLS)), fatten = 5) + stat_boxplot(geom = "errorbar")
+
+#Create a text
+
+
+StatLabelLls <- grobTree(textGrob("Kruskal-Wallis chi-squared = 17.53, df = 3, p-value = 0.0005497", x="1",  y=12, hjust=0,
+  gp=gpar(col="black", fontsize=13)))
+# Plot
+
+p  + scale_x_discrete(labels=c("Control" = "Ambient", "Development" = bquote(AM[DevA=OW]),">50Gens" = "OW")) + ylab("Lower Lethal Salinity (ppt)")+ annotate("text", x = 2.5, y=12, label = "Kruskal-Wallis chi2 = 17.53, df = 3, p-value = 0.0005497")
+
+```
+
+Boxplot of replicates for ULT
+
+```{r}
+mydata
+str(mydata)
+mydata$Group <- factor(mydata$Group,
+    levels = c(">50Gens","Development","Control", "DevelopmentAmbient","ThreeGens","ThreeGensAmbient"),ordered = TRUE)
+
+TreatLabs <- c(">50Gens","Development","Control", "DevelopmentAmbient","ThreeGens","ThreeGensAmbient")
+mydata$Treatment<- as.factor(mydata$Treatment)
+
+mydata$Replicate<- as.factor(mydata$Replicate)
+
+p <- ggplot(mydata, aes(x=Replicate, y=ULT, fill=Treatment)) + 
+    geom_boxplot(aes(middle = mean(ULT)), fatten = 5) + stat_boxplot(geom = "errorbar")
+
+p  + scale_x_discrete(labels=c("Control" = "Ambient", "Development" = bquote(AM[DevA=OW]),">50Gens" = "OW")) + ylab("Upper Lethal Temperature (°C)")+ annotate("text", x = 2.5, y=39.5, label = "Kruskal-Wallis chi2 = 4.1994, df = 3, p-value = 0.2407")
+
+```
+
+
+
+
+Effect of Group on LLS
+```{r}
+kruskal.test(OLLS ~ Group, data=PlasticityLLS)
+```
+
+Use the ART ANOVA to incorporate both factors in the model
+```{r}
+PlasticityLLS$Group <- as.factor(PlasticityLLS$Group)
+m2 <- art(OLLS ~ Group+ (1|Replicate), data=PlasticityLLS)
+summary(m2)
+```
+
+Aligned Rank Transform of Factorial Model
+
+Call:
+art(formula = OLLS ~ Group + (1 | Replicate), data = PlasticityLLS)
+
+Column sums of aligned responses (should all be ~0):
+Group 
+    0 
+
+F values of ANOVAs on aligned responses not of interest (should all be ~0):
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+
+```{r}
+Model2 <- anova(m2)
+summary(Model2)
+Model2
+```
+
+Analysis of Variance of Aligned Rank Transformed Data
+
+Table Type: Analysis of Deviance Table (Type III Wald F tests with Kenward-Roger df) 
+Model: Mixed Effects (lmer)
+Response: art(OLLS)
+
+              F Df Df.res  Pr(>F)  
+1 Group 0.66707  2 39.234 0.51893  
+---
+Signif. codes:   0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1 
+
+With or without replicate... no effect of group on LLS
+
+Assessing effect of group for ULT
+```{r}
+TreatMod <- kruskal.test(ULT~Group, mydata)
+TreatMod
+```
+	Kruskal-Wallis rank sum test
+
+data:  ULT by Group
+Kruskal-Wallis chi-squared = 23.601, df = 5, p-value = 0.000259
+
+
+```{r}
+DT = dunnTest(ULT ~ Group,
+              data=mydata,
+              method="bh")
+DT
+```
+
+                              Comparison          Z      P.unadj       P.adj
+1                      >25Gens - Control  2.8468296 0.0044156995 0.016558873
+2                  >25Gens - Development -0.8134565 0.4159563657 0.479949653
+3                  Control - Development -3.6527756 0.0002594210 0.001945657
+4           >25Gens - DevelopmentAmbient  1.1688398 0.2424681971 0.363702296
+5           Control - DevelopmentAmbient -1.5918809 0.1114114656 0.185685776
+6       Development - DevelopmentAmbient  1.9509833 0.0510590338 0.109412215
+7                    >25Gens - ThreeGens -1.1419919 0.2534573764 0.345623695
+8                    Control - ThreeGens -3.7841283 0.0001542482 0.002313723
+9                Development - ThreeGens -0.3926278 0.6945944115 0.694594411
+10        DevelopmentAmbient - ThreeGens -2.1922474 0.0283616457 0.070904114
+11            >25Gens - ThreeGensAmbient  1.9455093 0.0517137076 0.096963202
+12            Control - ThreeGensAmbient -0.8550675 0.3925138023 0.490642253
+13        Development - ThreeGensAmbient  2.7386700 0.0061688259 0.018506478
+14 DevelopmentAmbient - ThreeGensAmbient  0.7368135 0.4612358028 0.494181217
+15          ThreeGens - ThreeGensAmbient  2.9290609 0.0033998783 0.016999391
+
+Levene test on plasticity data
+```{r}
+str(PlasticityData)
+
+PlasticityData$Group <- as.factor(PlasticityData$Group)
+
+PlasticityData <- PlasticityData %>% group_by(Group) %>% 
+  mutate(ULT.med = ifelse(ULT,median(ULT, na.rm=TRUE), ifelse(ULT=NA, NA)))
+PlasticityData
+```
+The code above skips NA values and calculates sample medians for each factor combination, putting them in a new column (dat.med) in the dataset.
+
+Then we calculate the residuals, changing them to absolute values and putting them in another column:
+
+```{r}
+PlasticityData$ULT.med.res<-abs(PlasticityData$ULT-PlasticityData$ULT.med)
+
+# Then we run an ANOVA, and post-hoc if necessary:
+levene.dat.aov<-aov(ULT.med.res~Group,PlasticityData)
+#levene.dat.aov<-aov(ULT.med.res~Group+Error(Subject/(Group)),PlasticityData)
+#the commented out code is for repeated measures anova ... which we don't need
+summary(levene.dat.aov)
+TukeyHSD(levene.dat.aov)
+```
+
+$Group
+                              diff        lwr        upr     p adj
+Control->25Gens       -0.116666667 -0.6513357  0.4180024 0.9377888
+Development->25Gens    0.664583333  0.1684314  1.1607352 0.0044198
+ThreeGens->25Gens      0.008333333 -0.5263357  0.5430024 0.9999742
+Development-Control    0.781250000  0.2540592  1.3084408 0.0013992
+ThreeGens-Control      0.125000000 -0.4385907  0.6885907 0.9349468
+ThreeGens-Development -0.656250000 -1.1834408 -0.1290592 0.0091316
+
+Testing significance of group on LLS
+
+```{r}
+kruskal.test(OLLS~Group, data=myLLSdata)
+```
+
+data:  OLLS by Group
+Kruskal-Wallis chi-squared = 0.80578, df = 2, p-value = 0.6684
+
+(Compared to 0.51893 with replicate in the model)
+
+```{r}
+kruskal.test(OLLS~Group, data=RSDataLLS)
+```
+data:  OLLS by Group
+Kruskal-Wallis chi-squared = 0.20043, df = 1, p-value = 0.6544
+
+```{r}
+kruskal.test(OLLS~Group, data=PlasticityLLS)
+```
+	Kruskal-Wallis rank sum test
+
+data:  OLLS by Group
+Kruskal-Wallis chi-squared = 0.80578, df = 2, p-value = 0.6684
+
+No matter which groups you look at ... no effect of temp on LLS
+
+Temperature Salinity Analysis No Ham Beach
+
+```{r}
+TSdata$Population <- as.factor(TSdata$Population)
+
+#Subset data for only esker point
+TSdata
+
+AmbientOnly <- subset(TSdata, Population == "UCONNControl")
+
+m <- art(ULT ~ Salinity, data=AmbientOnly)
+summary(m)
+```
+
+```{r}
+art.con(m,"Salinity")
+```
+ contrast                estimate   SE df t.ratio p.value
+ Salinity15 - Salinity20    -4.05 2.90 17  -1.398  0.3640
+ Salinity15 - Salinity30    -6.90 2.90 17  -2.385  0.0708
+ Salinity20 - Salinity30    -2.86 2.78 17  -1.027  0.5705
+
+
+
+
+ART Anova for temperature salinity analysis
+```{r}
+TSdata$Population <- as.factor(TSdata$Population)
+m <- art(ULT ~ Population*Salinity, data=TSdata)
+summary(m)
+```
+
+Contrasts
+```{r}
+art.con(m,"Population")
+```
+
+ contrast          estimate   SE df t.ratio p.value
+ HB - UCONNControl       18 2.58 35   6.995  <.0001
+
+```{r}
+art.con(m,"Salinity")
+```
+ contrast                estimate   SE df t.ratio p.value
+ Salinity15 - Salinity20   -12.76 4.15 35  -3.072  0.0112
+ Salinity15 - Salinity30   -14.19 4.15 35  -3.416  0.0045
+ Salinity20 - Salinity30    -1.43 4.07 35  -0.351  0.9345
+
+Plotting plasticity result
+```{r}
+#Turn your 'treatment' column into a character vector
+PlasticityData$Group <- as.character(PlasticityData$Group)
+#Then turn it back into a factor with the levels in the correct order
+PlasticityData$Group <- factor(PlasticityData$Group, levels=unique(PlasticityData$Group))
+
+PlasticityData$Group <- factor(PlasticityData$Group, levels=c("Control", "Development", "ThreeGens", ">25Gens"))
+
+PlasticityData$Treatment<- as.factor(PlasticityData$Treatment)
+
+p <- ggplot(PlasticityData, aes(x=Group, y=ULT, fill=Treatment)) + 
+  geom_boxplot(aes(fatten = 5) + stat_boxplot() ) # Changing the middle line to the mean and widening the line
+
+Plot1 <- p + geom_dotplot(binaxis='y', stackdir='center', dotsize=0.7)+ theme_classic()+ geom_text(aes(label=c("a"),y=37.5,x="Control"),size=10)+ geom_text(aes(label=c("b"),y=39.5,x="Development"),size=10)+ geom_text(aes(label=c("b"),y=38,x="ThreeGens"),size=10)+ geom_text(aes(label=c("b"),y=38,x=">25Gens"),size=10)+ theme(text = element_text(size = 18))+ ylab("Upper Lethal Temperature (°C)") + xlab(" ")+ scale_x_discrete(labels=c("Control" = "AM", "Development" = bquote(AM[DevOW]),"ThreeGens" = bquote(AM["3GensOW"]),">25Gens" = "OW"))
+Plot1 +scale_fill_manual(values = c("dodgerblue","red3"))
+```
+
+Plotting Relaxed Selection Result
+
+```{r}
+RSData
+RSData$Group <- factor(RSData$Group,
+    levels = c(">25Gens","DevelopmentAmbient","ThreeGensAmbient","Control"),ordered = TRUE)
+
+TreatLabs <- c(">25Gens","DevelopmentAmbient","ThreeGensAmbient", "Control")
+RSData$Treatment<- as.factor(RSData$Treatment)
+p <- ggplot(RSData, aes(x=Group, y=ULT, fill=Treatment)) + 
+    geom_boxplot() + stat_boxplot()
+
+p  + scale_x_discrete(labels=c("Control" = "Ambient", "DevelopmentAmbient" = bquote(OW[DevAM]),"ThreeGensAmbient" = bquote(OW["3GensAM"]),">25Gens" = "OW"))
+
+
+
+
+RSPLOT <- p + geom_dotplot(binaxis='y', stackdir='center', dotsize=0.7)+ theme_classic()+geom_text(aes(label=c("a"),y=37.5,x=">25Gens"),size=10)+ geom_text(aes(label=c("a,b"),y=36.8,x="DevelopmentAmbient"),size=10)+geom_text(aes(label=c("a,b"),y=36.8,x="ThreeGensAmbient"),size=10)+geom_text(aes(label=c("b"),y=36.8,x="Control"),size=10)+ theme(text = element_text(size = 18)) + ylab("Upper Lethal Temperature (°C)") + xlab(" ") + scale_x_discrete(labels=c("Control" = "AM", "DevelopmentAmbient" = bquote(OW[DevAM]),"ThreeGensAmbient" = bquote(OW["3GensAM"]),">25Gens" = "OW")) 
+
+RSPLOT+ scale_fill_manual(values=c("dodgerblue","red3"))
+```
+
+LLS Plot
+```{r}
+#Turn your 'treatment' column into a character vector
+PlasticityLLS$Group <- as.character(PlasticityLLS$Group)
+#Then turn it back into a factor with the levels in the correct order
+PlasticityLLS$Group <- factor(PlasticityLLS$Group, levels=unique(PlasticityLLS$Group))
+
+PlasticityLLS$Group <- factor(PlasticityLLS$Group, levels=c("Control", "Development",  ">25Gens"))
+
+PlasticityLLS$Treatment<- as.factor(PlasticityLLS$Treatment)
+p <- ggplot(PlasticityLLS, aes(x=Group, y=OLLS, fill=Treatment)) + 
+    geom_boxplot(aes() + stat_boxplot())
+p
+
+
+p + geom_dotplot(binaxis='y', stackdir='center', dotsize=0.7)+ theme_classic()+ scale_fill_manual(values=c("dodgerblue","red3"))+ylab("Lower Lethal Salinity (ppt)") + scale_x_discrete(labels=c("Control" = "AM", "Development" = bquote(AM[DevOW]),">25Gens" = "OW"))+ xlab(" ")+ geom_text(aes(label=c("a"),y=18,x="Control"),size=10)+geom_text(aes(label=c("a"),y=18,x="Development"),size=10)+geom_text(aes(label=c("a"),y=18,x=">25Gens"),size=10)+ theme(text = element_text(size = 22)) 
+```
+
+
+Difference in means between treatments?
+```{r}
+PlasticityLLS
+
+PlasticityLLS %>%
+  group_by(Group) %>%
+  summarise_at(vars(OLLS), list(name = mean))
+```
+
+Temp by salinity plots
+```{r}
+mydata_melt <- melt(TSdata)
+mydata_melt
+
+mydata_melt$Salinity <- factor(mydata_melt$Salinity,
+    levels = c("30","20","15"),ordered = TRUE)
+```
+
+```{r}
+ TreatLabs <- c("30","20","15")
+```
+
+```{r}
+
+plot1 <- ggplot(mydata_melt,aes(x=Salinity,y=value,fill=Population))+  geom_boxplot(aes(middle = mean(value)), fatten = 5) + stat_boxplot(geom = "errorbar")
+
+plot2 <- (plot1 + geom_dotplot(binaxis='y', stackdir='center',dotsize=0.5,
+                 position=position_dodge(.7))+scale_fill_manual(values=c("grey3","grey3") ))
+plot2
+
+plot2 +ylab("Upper Lethal Temperature (°C)")+ xlab("Salinity (ppt)")  + scale_x_discrete(labels= TreatLabs) +scale_fill_discrete(name = "Population", labels = c("Hammonasset Beach", "Esker Point"))+ scale_fill_manual(values=c("purple4","darkorange3"),name = "Population", labels = c("Hammonasset Beach", "(Ambient) Esker Point") ) + annotate("text", x = "30", hjust=4.8, y = 39,label = "a", size=7) + 
+  annotate("text", x = "30", hjust=-4.8 ,y = 37, label = "b", size=7) + annotate("text", x = "20", hjust=4.8, y = 39,label = "a", size=7)  + annotate("text", x = "20", hjust=-4.8 ,y = 37, label = "b", size=7) + annotate("text", x = "15", hjust=4.8, y = 39,label = "c", size=7)  + annotate("text", x = "15", hjust=-4.8 ,y = 37, label = "d", size=7)+ theme_classic(base_size = 22)
+
+```
+
+TS Plots ambient only
+
+```{r}
+mydata_meltSal <- melt(AmbientOnly)
+mydata_meltSal
+
+mydata_meltSal$Salinity <- factor(mydata_meltSal$Salinity,
+    levels = c("30","20","15"),ordered = TRUE)
+```
+
+```{r}
+ TreatLabs <- c("30","20","15")
+```
+
+```{r}
+
+plot1 <- ggplot(mydata_meltSal,aes(x=Salinity,y=value,fill=Population))+  geom_boxplot(aes() + stat_boxplot())
+
+plot2 <- (plot1 + geom_dotplot(binaxis='y', stackdir='center',dotsize=0.7,
+                 position=position_dodge(.7))+scale_fill_manual(values=c("grey3") ))
+plot2
+
+plot2 +theme_classic(base_size = 22)+ylab("Upper Lethal Temperature (°C)")+ xlab("Salinity (ppt)")  + scale_x_discrete(labels= TreatLabs) +scale_fill_discrete(name = "Population", labels = c("Hammonasset Beach", "Esker Point"))+ scale_fill_manual(values=c("dodgerblue"),name = "Population", labels = c("Ambient")+ theme(text = element_text(size = 50))  ) + geom_text(aes(label=c("a"),y=37,x="30"),size=10)+geom_text(aes(label=c("a"),y=37,x="20"),size=10)+geom_text(aes(label=c("a"),y=37,x="15"),size=10)+ theme(text = element_text(size = 22)) 
+
+# annotate("text", x = "30", hjust=4.8, y = 39,label = "a", size=7) + 
+#   annotate("text", x = "30", hjust=-4.8 ,y = 37, label = "b", size=7) + annotate("text", x = "20", hjust=4.8, y = 39,label = "a", size=7)  + annotate("text", x = "20", hjust=-4.8 ,y = 37, label = "b", size=7) + annotate("text", x = "15", hjust=4.8, y = 39,label = "c", size=7)  + annotate("text", x = "15", hjust=-4.8 ,y = 37, label = "d", size=7)+ theme_classic(base_size = 22)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+What is the loss of ULT across salinity treatments for AM line?
+
+```{r}
+
+#subset for UCONNControl animals
+
+AmLLSData <- mydata_meltSal[ which(mydata_meltSal$Population=='UCONNControl' ),]
+
+AmLLSData %>%
+  group_by(Salinity) %>%
+  summarise_at(vars(value), list(name = mean))
+
+```
+
+Levene test comparing variance between populations
+
+```{r}
+str(mydata_melt)
+
+mydata_melt$Population <- as.factor(mydata_melt$Population)
+
+mydata_melt <- mydata_melt %>% group_by(Population) %>% 
+  mutate(value.med = ifelse(value,median(value, na.rm=TRUE), ifelse(value=NA, NA)))
+mydata_melt
+```
+The code above skips NA values and calculates sample medians for each factor combination, putting them in a new column (dat.med) in the dataset.
+
+Then we calculate the residuals, changing them to absolute values and putting them in another column:
+
+```{r}
+mydata_melt$value.med.res<-abs(mydata_melt$value-mydata_melt$value.med)
+mydata_melt
+# Then we run an ANOVA, and post-hoc if necessary:
+levene.dat.aov<-aov(value.med.res~Population,mydata_melt)
+#levene.dat.aov<-aov(ULT.med.res~Group+Error(Subject/(Group)),PlasticityData)
+#the commented out code is for repeated measures anova ... which we don't need
+summary(levene.dat.aov)
+TukeyHSD(levene.dat.aov)
+```
+
+$Population
+                      diff        lwr         upr     p adj
+UCONNControl-HB -0.4333333 -0.8046929 -0.06197382 0.0233597
+
+
+
+Appendix Figure Two
+
+
+Loading in ULT Data
+```{r}
+
+mydata <- read.table("LHS_ctmax_Complete.csv", header=TRUE, 
+  	sep=",")
+head(mydata)
+```
+
+```{r}
+mysubdata <- within(mydata, rm(Plate))
+mysubsubdata <- within(mysubdata, rm(Sex))
+mysubsubdata
+
+mysubsetdata <- within(mysubsubdata, rm(MeanMax))
+mysubsetdata
+```
+
+```{r}
+
+mydata_melt <- melt(mysubsetdata)
+mydata_melt
+```
+
+
+```{r}
+
+ NYdata<- mydata_melt %>% filter(Population == "NewYork")
+ 
+ NYdata
+ 
+ NYdatadata <-  NYdata %>% filter(Stage == "Adult")
+ 
+ NYdatadata
+ 
+NYplot <- ggplot(NYdatadata, aes(x=Population, y=value)) + 
+  geom_boxplot()+ylab("Upper Lethal Temperature (°C)") 
+
+NYplot
+
+nNYplot <- NYplot + geom_dotplot(binaxis='y', stackdir='center',dotsize=0.75,position=position_dodge(.5))
+nNYplot + theme_classic(base_size = 22)
+```
+
+
+Appendix Figure Three
+
+
+```{r}
+mydata <- read.table("UCONN_GradualSalinity_Trial.csv", header=TRUE, 
+  	sep=",")
+head(mydata)
+```
+
+
+reformat
+```{r}
+mydata$Treatment <- paste(mydata$Line,mydata$Condition)
+mydata
+```
+
+Subset the data to remove the extra columns
+```{r}
+
+mysubdata <- within(mydata, rm(Line))
+mysubsubdata <- within(mysubdata, rm(Condition))
+plotdata <- within(mysubsubdata,rm(Replicate))
+
+plotdata
+
+```
+
+
+
+
+```{r}
+mydata_melt <- melt(plotdata)
+mydata_melt
+```
+
+
+```{r}
+plot1 <- (ggplot(mydata_melt,aes(x=Sex,y=value,fill=Sex))+geom_boxplot(width=0.9/length(unique(mydata_melt$Sex)),position=position_dodge(.5)))
+
+plot2 <- (plot1 + geom_dotplot(binaxis='y', stackdir='center', dotsize=0.75,
+                 position=position_dodge(.5))+scale_fill_manual(values=c("grey3","grey3") ))
+plot2
+
+plot2 + scale_fill_manual(values=c("tomato","dodgerblue")) +ylab("Lower Lethal Salinity (ppt)") + theme_bw(base_size = 15)+guides(fill=guide_legend(
+                 keywidth=0.4,
+                 keyheight=0.4,
+                 default.unit="inch")) + scale_y_continuous(breaks=c(0,2,4,6,8,10,12))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
